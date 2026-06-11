@@ -1,0 +1,292 @@
+{
+  "name": "LinkedIn Post Digest (Every 3-4 Days)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                3,
+                6
+              ],
+              "triggerAtHour": 12
+            }
+          ]
+        }
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Schedule Every 3-4 Days",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "LinkedIn_Dump"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "processed ",
+              "lookupValue": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Read Unprocessed Posts from Dump",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// EDIT THIS SECTION \u2014 your context and preferences\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nconst MY_CONTEXT = {\n  name: 'Saswati Gorai',\n  role: 'Growth AI Strategist and Automation Specialist, Bangalore',\n  goal: 'Land GTM Engineer / Growth Architect / Automation Specialist role. Target: $5,000/month',\n\n\n  company: 'Building VysionAI \u2014 AI automation agency',\n  active_projects: [\n    'n8n self-hosted workflows on Hostinger VPS',\n    'Voice agent demo (Mona) via Millis AI',\n    'SaaS cost calculator on Bolt/Netlify',\n    'Reddit ICP research agent',\n    'LinkedIn intelligence system (this workflow)'\n  ],\n  tools: 'n8n, Make.com, Clay, Apollo, HubSpot, OpenRouter, Claude, Bolt, Netlify, Canva',\n  interests: 'AI tools and use cases, GTM systems, PLG, outbound automation, lifecycle marketing, content systems, how companies hire GTM roles, SaaS trends, creator economy',\n  use_digest_for: 'Interview language, spotting relevant tools, content ideas, finding potential clients or collaborators',\n  background: '7 years Product Management at Axis Bank, MBA IIT Kharagpur, transitioned into growth marketing and AI automation'\n};\n\n// Days to look back \u2014 change this number freely\nconst DAYS_BACK = 7;\n\n// Min relevancy score to include in digest (0 = include all)\nconst MIN_SCORE = 20;\n\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n// DO NOT EDIT BELOW THIS LINE\n// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\nconst cutoffDate = new Date();\ncutoffDate.setDate(cutoffDate.getDate() - DAYS_BACK);\n\nconst allRows = $input.all();\n\nconst recent = allRows.filter(function(item) {\n  const row = item.json;\n  const dateField = row['posted_date '] || row.posted_date || row.scraped_at || '';\n  if (!dateField) return false;\n  try {\n    const score = parseInt(row.relevancy_score || '0', 10);\n    return new Date(dateField) >= cutoffDate && score >= MIN_SCORE;\n  } catch(e) { return true; }\n});\n\nif (recent.length === 0) {\n  return [{ json: { skip: true, reason: 'No posts in last ' + DAYS_BACK + ' days above score ' + MIN_SCORE, post_count: 0, prompt: '', post_ids: [] } }];\n}\n\nrecent.sort(function(a, b) {\n  return parseInt(b.json.relevancy_score || '0', 10) - parseInt(a.json.relevancy_score || '0', 10);\n});\n\nconst blocks = recent.map(function(item, i) {\n  const p = item.json;\n  const creatorName = (p['creator_name '] || p.creator_name || '').trim();\n  const postUrl = (p['post_url '] || p.post_url || '').trim();\n  const postedDate = (p['posted_date '] || p.posted_date || '').substring(0, 10);\n  const postText = (p['post_text '] || p.post_text || '').substring(0, 1500);\n  const score = p.relevancy_score || '?';\n  const reason = p.relevancy_reason || '';\n  return 'POST ' + (i+1) + ' | Score: ' + score + ' | ' + creatorName + ' | ' + postedDate + '\\nURL: ' + postUrl + '\\nWhy relevant: ' + reason + '\\n' + postText;\n}).join('\\n\\n---\\n\\n');\n\nconst today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });\n\nconst prompt = 'You are a personal intelligence assistant for ' + MY_CONTEXT.name + ', ' + MY_CONTEXT.role + '.\\n\\n' +\n'CONTEXT:\\n' +\n'- Goal: ' + MY_CONTEXT.goal + '\\n' +\n'- Company: ' + MY_CONTEXT.company + '\\n' +\n'- Active projects: ' + MY_CONTEXT.active_projects.join(', ') + '\\n' +\n'- Tools: ' + MY_CONTEXT.tools + '\\n' +\n'- Interests: ' + MY_CONTEXT.interests + '\\n' +\n'- Uses this digest for: ' + MY_CONTEXT.use_digest_for + '\\n\\n' +\n'Below are ' + recent.length + ' LinkedIn posts from the last ' + DAYS_BACK + ' days (score >= ' + MIN_SCORE + '), sorted by relevancy. Each post includes its URL \u2014 include the URL next to every insight you extract.\\n\\n' +\nblocks + '\\n\\n---\\n\\n' +\n'Write the digest in this exact format:\\n\\n' +\n'NEW AI TOOLS & PRODUCTS\\n' +\n'Each: tool name | what it does | why relevant to Saswati | post URL\\n\\n' +\n'GTM & GROWTH TRENDS\\n' +\n'Key insights on GTM, PLG, outbound, sales motion. Flag what she should mention in interviews. Include post URL for each point.\\n\\n' +\n'HOW COMPANIES ARE RUNNING GTM\\n' +\n'Team structures, hiring signals, what is working right now. Include post URL for each point.\\n\\n' +\n'AUTOMATION & WORKFLOW IDEAS\\n' +\n'Systems or workflows she could build as VysionAI offerings or portfolio pieces. Include post URL.\\n\\n' +\n'INTERVIEW & OUTREACH LANGUAGE\\n' +\n'Exact phrases and frameworks she should use with recruiters and clients. Include post URL source.\\n\\n' +\n'CONTENT IDEAS\\n' +\n'3-5 content angles based on what is trending in these posts. Include post URL for each angle.\\n\\n' +\n'MUST-READ POSTS THIS ROUND\\n' +\n'Top 5 posts she should open and read fully. Format: creator name | one-line reason | URL\\n\\n' +\n'Be direct and specific. Tie everything to her goals. Today: ' + today;\n\nconst postIds = recent.map(function(item) { return item.json.post_id; }).filter(Boolean);\n\nreturn [{ json: { prompt: prompt, post_count: recent.length, post_ids: postIds, skip: false } }];"
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Context + Build Prompt \u2014 EDIT HERE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "YOUR_OPENROUTER_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"model\": \"anthropic/claude-haiku-4-5\", \"max_tokens\": 4096, \"messages\": [{ \"role\": \"user\", \"content\": $json.prompt }] } }}",
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Claude Generate Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "contact@vysionai.com",
+        "subject": "={{ \"LinkedIn Intelligence Digest \u2014 \" + new Date().toLocaleDateString(\"en-IN\",{day:\"numeric\",month:\"long\",year:\"numeric\"}) + \" (\" + $(\"Context + Build Prompt \u2014 EDIT HERE\").first().json.post_count + \" posts)\" }}",
+        "message": "=={{ \"<html><body style='font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:20px'><h2 style='color:#0077b5;border-bottom:2px solid #0077b5;padding-bottom:8px'>LinkedIn Intelligence Digest</h2><p style='background:#f0f7ff;padding:10px;border-radius:6px;font-size:13px;color:#555'>\" + new Date().toLocaleDateString(\"en-IN\",{day:\"numeric\",month:\"long\",year:\"numeric\"}) + \" | \" + $(\"Context + Build Prompt \u2014 EDIT HERE\").first().json.post_count + \" posts analysed</p><pre style='white-space:pre-wrap;font-size:14px;line-height:1.9'>\" + ($json.choices[0].message.content || \"No content returned\").replace(/&/g,\"&amp;\").replace(/</g,\"&lt;\").replace(/>/g,\"&gt;\").replace(/https?:\\/\\/[^\\s]+/g, function(url) { return '<a href=\"' + url + '\" style=\"color:#0077b5\">' + url + '</a>'; }) + \"</pre><hr><p style='font-size:11px;color:#999'>Auto-generated by W6 \u00b7 VysionAI</p></body></html>\" }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Send LinkedIn Digest Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        0
+      ],
+      "webhookId": "YOUR_WEBHOOKID",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Gmail account VysionAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = $('Context + Build Prompt \u2014 EDIT HERE').first().json.post_ids || [];\nreturn ids.map(function(id) {\n  return { json: { post_id: id, processed: 'true' } };\n});"
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Prep Processed IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "LinkedIn_Dump"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "post_id": "={{ $json.post_id }}",
+            "processed ": "true"
+          },
+          "matchingColumns": [
+            "post_id"
+          ],
+          "schema": [
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "post_id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "processed ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Mark as Processed in Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Every 3-4 Days": {
+      "main": [
+        [
+          {
+            "node": "Read Unprocessed Posts from Dump",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Unprocessed Posts from Dump": {
+      "main": [
+        [
+          {
+            "node": "Context + Build Prompt \u2014 EDIT HERE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context + Build Prompt \u2014 EDIT HERE": {
+      "main": [
+        [
+          {
+            "node": "Claude Generate Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Generate Digest": {
+      "main": [
+        [
+          {
+            "node": "Send LinkedIn Digest Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send LinkedIn Digest Email": {
+      "main": [
+        [
+          {
+            "node": "Prep Processed IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Processed IDs": {
+      "main": [
+        [
+          {
+            "node": "Mark as Processed in Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "YOUR_VERSIONID",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "YOUR_INSTANCEID"
+  },
+  "id": "YOUR_CREDENTIAL_ID",
+  "tags": []
+}

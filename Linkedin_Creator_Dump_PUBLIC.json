@@ -1,0 +1,861 @@
+{
+  "name": "Linkedin Creator Dump",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Config"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "key",
+              "lookupValue": "last_scraped_date"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Read Config Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        192
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "LinkedIn_Query"
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Read LinkedIn Query Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const configRow = $('Read Config Sheet').first().json;\nconst lastScrapedDate = (configRow.value || '2026-01-01').toString().split('T')[0];\nconst creators = $input.all().map(function(item) { return item.json; });\nconst today = new Date().toISOString().split('T')[0];\nreturn creators\n  .filter(function(c) { return c.creator_name && c.profile_url; })\n  .map(function(c) {\n    const typeRaw = (c.type || '').toString().trim().toLowerCase();\n    const fromDate = typeRaw === 'new' ? '2026-01-01' : lastScrapedDate;\n    return { json: {\n      creator_name: c.creator_name, profile_url: c.profile_url,\n      type: typeRaw, from_date: fromDate, to_date: today, niche: c.niche || ''\n    }};\n  });"
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Prepare Creators + Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/harvestapi~linkedin-profile-posts/runs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_APIFY_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"targetUrls\": [$json.profile_url], \"maxPostsPerProfile\": 50, \"sortBy\": \"date\" } }}",
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Run Apify Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Wait 30 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        192
+      ],
+      "webhookId": "YOUR_WEBHOOKID"
+    },
+    {
+      "parameters": {
+        "url": "={{ \"https://api.apify.com/v2/acts/harvestapi~linkedin-profile-posts/runs/\" + $(\"Run Apify Scraper\").first().json.data.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_APIFY_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Poll Run Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"https://api.apify.com/v2/datasets/\" + $(\"Run Apify Scraper\").first().json.data.defaultDatasetId + \"/items?limit=200\" }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_APIFY_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Fetch Apify Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1792,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const creatorMeta = $('Prepare Creators + Date Range').item.json;\nconst fromDate = new Date(creatorMeta.from_date + 'T00:00:00Z');\nconst MY_CONTEXT = {\n  name: 'Saswati Gorai',\n  role: 'GTM Engineer and AI Automation Specialist, Bangalore',\n  goal: 'Land GTM Engineer / Growth Architect / Automation Specialist role. Target $5000/month',\n  company: 'Building VysionAI \u2014 AI automation agency',\n  background: '7 years PM at Axis Bank, MBA IIT Kharagpur. First marketing hire at Lets Hang \u2014 690 leads at $0.08/lead, 5 n8n workflows, full lifecycle automation.',\n  active_projects: 'n8n workflows on Hostinger VPS, voice agent Mona via Millis AI, SaaS cost calculator, Reddit ICP research agent, newsletter + YouTube intelligence system',\n  tools: 'n8n, Make.com, Clay, Apollo, HubSpot, OpenRouter, Claude, Bolt, Netlify',\n  interests: 'AI tools and use cases, GTM systems, PLG, outbound automation, lifecycle marketing, content systems, how companies hire GTM roles, SaaS trends, automation workflows, n8n builds',\n  score_80_plus: 'directly actionable \u2014 GTM workflow idea, AI tool announcement, hiring signal, outbound tactic, automation system I can build or use now',\n  score_50_79: 'useful background \u2014 market trends, strategic framing, good content angle',\n  score_below_50: 'not relevant \u2014 motivational fluff, personal news, unrelated industry'\n};\nconst rawData = $input.first().json;\nconst posts = Array.isArray(rawData) ? rawData : $input.all().map(function(i) { return i.json; });\nconst results = [];\nfor (const postData of posts) {\n  if (!postData || typeof postData !== 'object') continue;\n  const postedDate = postData.postedAt && postData.postedAt.date ? new Date(postData.postedAt.date) : null;\n  if (!postedDate || postedDate < fromDate) continue;\n  const postText = postData.content || '';\n  const repostText = (postData.repost && postData.repost.content) ? postData.repost.content : '';\n  results.push({ json: {\n    post_id: String(postData.id || postData.entityId || ''),\n    creator_name: creatorMeta.creator_name,\n    creator_url: creatorMeta.profile_url,\n    post_url: postData.linkedinUrl || '',\n    post_text: postText.substring(0, 5000),\n    repost_text: repostText.substring(0, 2000),\n    post_type: postData.type || 'post',\n    posted_date: postData.postedAt && postData.postedAt.date ? postData.postedAt.date : '',\n    likes: (postData.engagement && postData.engagement.likes) ? postData.engagement.likes : 0,\n    comments: (postData.engagement && postData.engagement.comments) ? postData.engagement.comments : 0,\n    shares: (postData.engagement && postData.engagement.shares) ? postData.engagement.shares : 0,\n    text_for_scoring: (postText + ' ' + repostText).trim().substring(0, 2000),\n    my_context: JSON.stringify(MY_CONTEXT)\n  }});\n}\nreturn results;"
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Filter by Date + Map Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "YOUR_OPENROUTER_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (function() { var vm = $json; var ctx = vm.my_context || \"{}\"; var ctxObj = {}; try { ctxObj = JSON.parse(ctx); } catch(e) {}; var ctxStr = \"Goal: \" + (ctxObj.goal||\"GTM Engineer\") + \". Interests: \" + (ctxObj.interests||\"AI, GTM, automation\") + \". Score 80+: \" + (ctxObj.score_80_plus||\"directly actionable\"); var prompt = \"Score this LinkedIn post 0-100 for relevancy. Return ONLY JSON: score and reason (max 12 words).\\n\\nPERSON: \" + ctxStr + \"\\n\\nPOST: \" + (vm.text_for_scoring||\"\") + \"\\n\\nReturn only: {\\\"score\\\": 85, \\\"reason\\\": \\\"short reason here\\\"}\"; return {\"model\":\"anthropic/claude-haiku-4-5\",\"max_tokens\":100,\"messages\":[{\"role\":\"user\",\"content\":prompt}]}; })() }}",
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Score Relevancy via OpenRouter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const post = $('Filter by Date + Map Fields').item.json;\nconst scoreResp = $json;\nlet score = 0, reason = '';\ntry {\n  const c = scoreResp.choices && scoreResp.choices[0] && scoreResp.choices[0].message ? scoreResp.choices[0].message.content : '{}';\n  const m = c.match(new RegExp('{[^}]+}'));\n  const p = JSON.parse(m ? m[0] : '{}');\n  score = p.score || 0; reason = p.reason || '';\n} catch(e) { score = 0; reason = 'Parse error'; }\nreturn {\n  post_id: post.post_id,\n  'creator_name ': post.creator_name,\n  'creator_url ': post.creator_url,\n  'post_url ': post.post_url,\n  'post_text ': post.post_text,\n  'repost_text ': post.repost_text,\n  'post_type ': post.post_type,\n  'posted_date ': post.posted_date,\n  'likes ': post.likes,\n  'comments ': post.comments,\n  'shares ': post.shares,\n  relevancy_score: score,\n  relevancy_reason: reason,\n  'processed ': 'false',\n  scraped_at: new Date().toISOString()\n};"
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Assemble Final Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "LinkedIn_Dump"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "creator_name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "creator_url ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "post_url ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "post_text ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "repost_text ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "post_type ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "posted_date ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "likes ",
+              "displayName": "likes ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "comments ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "shares ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "relevancy_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "relevancy_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "processed ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "YOUR_WORKFLOW_ID",
+              "displayName": "scraped_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        }
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Write to LinkedIn Dump",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2688,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "LinkedIn_Query"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "profile_url": "={{ $('Prepare Creators + Date Range').first().json.profile_url }}",
+            "type": "existing"
+          },
+          "matchingColumns": [
+            "profile_url"
+          ],
+          "schema": [
+            {
+              "id": "YOUR_CREDENTIAL_ID",
+              "displayName": "profile_url",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Flip New to Existing in Query Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2896,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Process Each Creator",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "LinkedIn_Dump"
+        },
+        "options": {}
+      },
+      "name": "Read LinkedIn Dump",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        256,
+        576
+      ],
+      "id": "YOUR_CREDENTIAL_ID",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Config"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "last_scraped_date",
+            "value": "={{ $json.last_scraped_date }}",
+            "notes": "Updated from max scraped_at in LinkedIn_Dump"
+          },
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "id": "key",
+              "displayName": "key",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value",
+              "displayName": "value",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Update Config Date",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        576
+      ],
+      "id": "YOUR_CREDENTIAL_ID",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allRows = $input.all();\nlet maxDate = null;\nfor (const row of allRows) {\n  const val = row.json && row.json.scraped_at ? row.json.scraped_at : null;\n  if (!val) continue;\n  const d = new Date(val);\n  if (!isNaN(d.getTime()) && (!maxDate || d > maxDate)) {\n    maxDate = d;\n  }\n}\nif (!maxDate) throw new Error('No valid scraped_at values found in LinkedIn_Dump sheet');\nconst dateStr = maxDate.toISOString().split('T')[0];\nreturn [{ json: { last_scraped_date: dateStr } }];"
+      },
+      "name": "Compute Max Scraped Date1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        576
+      ],
+      "id": "YOUR_CREDENTIAL_ID"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 23
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        576
+      ],
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 22
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        192
+      ],
+      "id": "YOUR_CREDENTIAL_ID",
+      "name": "Schedule Trigger1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read Config Sheet": {
+      "main": [
+        [
+          {
+            "node": "Read LinkedIn Query Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read LinkedIn Query Sheet": {
+      "main": [
+        [
+          {
+            "node": "Prepare Creators + Date Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Creators + Date Range": {
+      "main": [
+        [
+          {
+            "node": "Process Each Creator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Apify Scraper": {
+      "main": [
+        [
+          {
+            "node": "Wait 30 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Poll Run Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Run Status": {
+      "main": [
+        [
+          {
+            "node": "Fetch Apify Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Apify Results": {
+      "main": [
+        [
+          {
+            "node": "Filter by Date + Map Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter by Date + Map Fields": {
+      "main": [
+        [
+          {
+            "node": "Score Relevancy via OpenRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Relevancy via OpenRouter": {
+      "main": [
+        [
+          {
+            "node": "Assemble Final Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Final Row": {
+      "main": [
+        [
+          {
+            "node": "Write to LinkedIn Dump",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to LinkedIn Dump": {
+      "main": [
+        [
+          {
+            "node": "Flip New to Existing in Query Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flip New to Existing in Query Sheet": {
+      "main": [
+        [
+          {
+            "node": "Process Each Creator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Each Creator": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Run Apify Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read LinkedIn Dump": {
+      "main": [
+        [
+          {
+            "node": "Compute Max Scraped Date1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Max Scraped Date1": {
+      "main": [
+        [
+          {
+            "node": "Update Config Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read LinkedIn Dump",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Read Config Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "YOUR_VERSIONID",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "YOUR_INSTANCEID"
+  },
+  "id": "YOUR_CREDENTIAL_ID",
+  "tags": []
+}
